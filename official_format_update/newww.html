@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSIT Vyomnauts Data</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css"/>
+<style>
+:root {
+  --bg: #000000;
+  --panel: #ffffff;
+  --panel-soft: #f3f8ff;
+  --border: #8fc1f4;
+  --border-strong: #236fd6;
+  --text: #18324a;
+  --dim: #5e7891;
+  --cyan: #1976d2;
+  --blue: #0a6fff;
+  --green: #16835b;
+  --orange: #c76a13;
+  --red: #c62828;
+  --yellow: #d5a400;
+  --font-mono: 'Share Tech Mono', monospace;
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Exo 2', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100vh;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+#topbar,
+#main,
+#compare-section,
+#footer {
+  width: 100%;
+}
+
+#topbar {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 0.8fr 0.8fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  background: #dceeff;
+  border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.top-label,
+.panel-title,
+.sensor-key,
+.gauge-label,
+.footer-label,
+.map-tool-title,
+.compare-subtitle {
+  color: var(--dim);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.top-label {
+  font-size: 0.58rem;
+  margin-bottom: 4px;
+}
+
+.top-value {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.team-title {
+  justify-content: center;
+  color: #0f4f9e;
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.clock {
+  color: var(--green);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+#main {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(560px, 1.35fr) minmax(280px, 1fr);
+  gap: 10px;
+  padding: 10px;
+}
+
+.panel,
+.compare-panel,
+.map-tool-card,
+.sensor-card,
+.gauge-wrap,
+.port-control {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.panel {
+  padding: 12px;
+  overflow: hidden;
+}
+
+.panel-title {
+  color: var(--cyan);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.panel-title.green {
+  color: var(--green);
+}
+
+.panel-title.orange {
+  color: var(--orange);
+}
+
+.led {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.led.green { background: var(--green); }
+.led.orange { background: var(--orange); }
+.led.red { background: var(--red); }
+.led.cyan { background: var(--cyan); }
+.led.gray { background: #9aafc2; }
+
+/* Idle / disconnected state styles */
+.gauge-status.nosignal { color: #9aafc2; }
+.idle-disabled { opacity: 0.45; cursor: not-allowed !important; pointer-events: none; }
+.no-data-placeholder {
+  color: #9aafc2;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 24px 10px;
+  letter-spacing: 0.04em;
+}
+.idle-marker-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(220,238,255,0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  z-index: 10;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: #7a9ab8;
+  letter-spacing: 0.07em;
+  border-radius: 8px;
+  pointer-events: none;
+  backdrop-filter: blur(1px);
+}
+.idle-marker-overlay .overlay-icon {
+  font-size: 1.6rem;
+  opacity: 0.45;
+  line-height: 1;
+}
+.idle-marker-overlay .overlay-line1 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #5e7891;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.idle-marker-overlay .overlay-line2 {
+  font-size: 0.64rem;
+  color: #9aafc2;
+  letter-spacing: 0.06em;
+}
+
+.gauges-grid,
+.sensor-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.gauge-wrap {
+  padding: 12px 8px;
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.gauge-wrap svg {
+  overflow: visible;
+  width: 125px;
+  height: 125px;
+}
+
+.gauge-val {
+  fill: #102d47;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.gauge-unit {
+  fill: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+}
+
+.gauge-label,
+.gauge-status {
+  font-size: 0.58rem;
+  margin-top: 4px;
+  text-align: center;
+}
+
+.gauge-status.stable { color: var(--green); }
+.gauge-status.warn { color: var(--orange); }
+.gauge-status.crit { color: var(--red); }
+
+.sensor-card {
+  background: var(--panel-soft);
+  padding: 10px;
+}
+
+.sensor-card.full {
+  grid-column: 1 / -1;
+}
+
+.sensor-card-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sensor-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.sensor-key {
+  font-size: 0.64rem;
+}
+
+.sensor-val {
+  color: #102d47;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.gnss-badge {
+  margin-left: auto;
+  padding: 2px 7px;
+  background: #e6f5ef;
+  border: 1px solid #98d4ba;
+  border-radius: 999px;
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+}
+
+.gnss-badge.good {
+  background: #e6f5ef;
+  border-color: #98d4ba;
+  color: var(--green);
+}
+
+.gnss-badge.warn {
+  background: #fff2df;
+  border-color: #f2bd75;
+  color: var(--orange);
+}
+
+.gnss-badge.bad {
+  background: #ffe8e8;
+  border-color: #f0a2a2;
+  color: var(--red);
+}
+
+.gps-good { color: var(--green) !important; }
+.gps-warn { color: var(--orange) !important; }
+.gps-bad { color: var(--red) !important; }
+
+/* ===================== TERRAIN CLASSIFICATION (ML) ===================== */
+
+.terrain-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.terrain-result {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.terrain-class {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f4f9e;
+}
+
+.terrain-confidence {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.terrain-timestamp {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--dim);
+}
+
+.terrain-probs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.terrain-prob-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 46px;
+  align-items: center;
+  gap: 8px;
+}
+
+.terrain-prob-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terrain-prob-row.top .terrain-prob-label {
+  color: #0f4f9e;
+  font-weight: 700;
+}
+
+.terrain-prob-track {
+  height: 8px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.terrain-prob-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.terrain-prob-row.top .terrain-prob-fill {
+  background: linear-gradient(90deg, var(--green), #1fae7a);
+}
+
+.terrain-prob-pct {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: right;
+}
+
+.terrain-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.terrain-filename {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.waveform {
+  width: 100%;
+  height: 18px;
+  margin-top: 4px;
+}
+
+canvas {
+  width: 100% !important;
+}
+
+.compare-graph canvas {
+  background: transparent !important;
+}
+
+.orient-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.orientation-scene {
+  width: min(180px, 100%);
+  height: 170px;
+  margin: 0 auto;
+  perspective: 520px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orientation-model {
+  width: 118px;
+  height: 150px;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 16px rgba(16,32,51,0.28));
+  transform-style: preserve-3d;
+  transform-origin: 50% 58%;
+  transition: transform 0.18s linear;
+  will-change: transform;
+}
+
+.orientation-model.cansat {
+  width: 138px;
+  height: 150px;
+}
+
+.orient-angles {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.angle-chip {
+  min-width: 70px;
+  padding: 5px 6px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.angle-label {
+  display: block;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+}
+
+.angle-num {
+  color: var(--text) !important;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-shadow: none !important;
+}
+
+#center-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#map-panel {
+  min-height: 300px;
+}
+
+.map-area {
+  width: 100%;
+  height: 260px;
+  overflow: hidden;
+  background: #dceeff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  position: relative;
+}
+
+#leaflet-map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-status-bar,
+.map-legend,
+.btn-row,
+.comms-status,
+.speed-btns,
+.port-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.status-pill,
+.map-btn,
+.ctrl-btn,
+.speed-btn,
+.port-connect {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--border-strong);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.status-pill.active,
+.speed-btn.active {
+  background: #dceeff;
+  color: #0f4f9e;
+}
+
+.map-tools {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.map-tool-card {
+  padding: 8px 10px;
+}
+
+.map-tool-title {
+  color: var(--cyan);
+  font-size: 0.62rem;
+  margin-bottom: 6px;
+}
+
+.dist-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  margin-bottom: 4px;
+}
+
+.dist-val {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.leaflet-tile-pane {
+  filter: saturate(1.03) contrast(1.02);
+}
+
+.leaflet-container,
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip,
+.leaflet-control-zoom a {
+  background: #ffffff !important;
+  color: var(--text) !important;
+  font-family: var(--font-mono);
+}
+
+.offline-map {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #dceeff;
+}
+
+.offline-map::before {
+  content: 'OFFLINE COORDINATE MAP';
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  z-index: 2;
+}
+
+.offline-track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.offline-road {
+  position: absolute;
+  height: 2px;
+  background: #b6d5f2;
+  transform-origin: left center;
+}
+
+.offline-road.r1 { left: -8%; top: 64%; width: 128%; transform: rotate(-8deg); }
+.offline-road.r2 { left: 22%; top: -8%; width: 92%; transform: rotate(66deg); }
+.offline-road.r3 { left: -12%; top: 32%; width: 80%; transform: rotate(24deg); }
+
+.offline-marker {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
+.offline-marker.rocket { background: var(--cyan); }
+.offline-marker.cansat { background: var(--green); }
+.offline-marker.ground {
+  background: var(--yellow);
+  border-radius: 4px;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.offline-marker.ground span {
+  transform: rotate(-45deg);
+}
+
+.offline-label,
+.offline-coords {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  position: absolute;
+  z-index: 3;
+}
+
+.offline-label {
+  transform: translate(12px, -50%);
+  white-space: nowrap;
+}
+
+.offline-coords {
+  left: 10px;
+  bottom: 8px;
+  line-height: 1.35;
+}
+
+.raw-serial-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.raw-serial-title {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.raw-log-actions {
+  min-width: 210px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.raw-log-actions .wide {
+  grid-column: 1 / -1;
+}
+
+.raw-serial-box {
+  height: 280px;
+  overflow: auto;
+  padding: 12px;
+  background: #102033;
+  border: 1px solid #29445f;
+  border-radius: 8px;
+  color: #d6f5dc;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.raw-serial-box .muted,
+.csv-state {
+  color: var(--dim);
+}
+
+.csv-state {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-align: right;
+}
+
+.csv-state.active {
+  color: var(--green);
+}
+
+#compare-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 10px;
+}
+
+.compare-panel {
+  padding: 10px;
+  min-height: 290px;
+}
+
+.compare-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.compare-title {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.compare-subtitle {
+  color: var(--cyan);
+  font-size: 0.56rem;
+}
+
+.compare-readout {
+  color: var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.compare-graph {
+  height: 225px;
+  padding: 4px;
+  background: #0a0a0a;
+  border: 1px solid #1e1e1e;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.compare-legend {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  margin-right: 4px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+#footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #dceeff;
+  border-top: 2px solid var(--border);
+}
+
+.footer-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.footer-label {
+  font-size: 0.58rem;
+}
+
+.ctrl-btn.connect,
+.port-control.cansat .port-connect {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.ctrl-btn.disconnect {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.ctrl-btn.stop {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+
+.ctrl-select {
+  min-height: 30px;
+  padding: 5px 8px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+}
+
+.port-strip {
+  align-items: flex-end;
+}
+
+.port-control {
+  display: grid;
+  grid-template-columns: auto minmax(145px, 1fr) auto auto minmax(78px, auto);
+  gap: 6px;
+  align-items: center;
+  padding: 6px;
+  background: #f7fbff;
+}
+
+.port-label,
+.baud-label,
+.comm-item {
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+}
+
+.comm-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.signal-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.bar {
+  width: 3px;
+  background: var(--cyan);
+  border-radius: 1px;
+}
+
+.data-stream {
+  min-width: 160px;
+  flex: 1;
+  overflow: hidden;
+  padding: 6px 8px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.footer-divider {
+  width: 1px;
+  height: 44px;
+  background: var(--border);
+}
+
+@media (max-width: 900px) {
+  #topbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .team-title {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  #main,
+  #compare-section {
+    grid-template-columns: 1fr;
+  }
+
+  #compare-section {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  #topbar,
+  #compare-section {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="top-field">
+    <div class="top-label">Team ID</div>
+    <div class="top-value team-name-space" id="team-id-display"> 2026 IN-SPACe-045 </div>
+  </div>
+  <div class="top-value team-title">PSIT Vyomnauts</div>
+  <div class="top-field">
+    <div class="top-label">Time</div>
+    <div class="top-value clock" id="met" style="color:#9aafc2;">--:--:--</div>
+  </div>
+  <div class="top-field">
+    <div class="top-label">GNSS Time (IST)</div>
+    <div class="top-value clock" id="clock" style="color:#9aafc2;">--:--:--</div>
+  </div>
+</div>
+
+<!-- MAIN THREE-COLUMN GRID -->
+<div id="main">
+
+  <!-- ===================== LEFT: CANSAT ===================== -->
+  <div style="display:flex;flex-direction:column;gap:10px;">
+
+    <!-- CIRCULAR GAUGES -->
+    <div class="panel">
+      <div class="panel-title green">CanSat Data</div>
+      <div class="gauges-grid" id="cansat-gauges"></div>
+    </div>
+
+    <!-- SENSOR CARDS -->
+    <div class="panel">
+      <div class="panel-title green">CanSat Sensors</div>
+      <div class="sensor-cards">
+        <!-- ACCEL -->
+        <div class="sensor-card">
+          <div class="sensor-card-title"><span class="led green"></span>ACCEL</div>
+          <div class="sensor-row"><span class="sensor-key">AX</span><span class="sensor-val" id="cs-ax">0.00 g</span></div>
+          <div class="sensor-row"><span class="sensor-key">AY</span><span class="sensor-val" id="cs-ay">0.00 g</span></div>
+          <div class="sensor-row"><span class="sensor-key">AZ</span><span class="sensor-val" id="cs-az">0.00 g</span></div>
+          <svg class="waveform"><polyline id="cs-accel-wave" points="" fill="none" stroke="var(--green)" stroke-width="1.2" opacity="0.7"/></svg>
+        </div>
+        <!-- GYRO -->
+        <div class="sensor-card">
+          <div class="sensor-card-title"><span class="led cyan"></span>GYRO</div>
+          <div class="sensor-row"><span class="sensor-key">GX</span><span class="sensor-val" id="cs-gx">0.0 deg/s</span></div>
+          <div class="sensor-row"><span class="sensor-key">GY</span><span class="sensor-val" id="cs-gy">0.0 deg/s</span></div>
+          <div class="sensor-row"><span class="sensor-key">GZ</span><span class="sensor-val" id="cs-gz">0.0 deg/s</span></div>
+          <svg class="waveform"><polyline id="cs-gyro-wave" points="" fill="none" stroke="var(--cyan)" stroke-width="1.2" opacity="0.7"/></svg>
+        </div>
+        <!-- GNSS -->
+        <div class="sensor-card full">
+          <div class="sensor-card-title"><span class="led orange"></span>GPS<span class="gnss-badge" id="cs-sats">-- SATS</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+            <div><div class="sensor-key">TIME</div><div class="sensor-val" id="cs-gnss-time">N/A</div></div>
+            <div><div class="sensor-key">LAT</div><div class="sensor-val" id="cs-lat">--</div></div>
+            <div><div class="sensor-key">LON</div><div class="sensor-val" id="cs-lon">--</div></div>
+            <div><div class="sensor-key">ALT</div><div class="sensor-val" id="cs-gnss-alt">--</div></div>
+            <div><div class="sensor-key">HDOP</div><div class="sensor-val" id="cs-hdop">--</div></div>
+            <div><div class="sensor-key">FIX</div><div class="sensor-val" id="cs-fix" style="color:var(--green)">--</div></div>
+          </div>
+        </div>
+        <!-- DIAGNOSTICS -->
+        <div class="sensor-card full">
+          <div class="sensor-card-title"><span class="led green"></span>DIAGNOSTICS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+            <div><div class="sensor-key">VOLTAGE</div><div class="sensor-val" id="cs-voltage">-- V</div></div>
+            <div><div class="sensor-key">PACKETS</div><div class="sensor-val" id="cs-packet-count">--</div></div>
+            <div><div class="sensor-key">UPTIME</div><div class="sensor-val" id="cs-time-stamping">-- s</div></div>
+            <div><div class="sensor-key">STATE</div><div class="sensor-val" id="cs-state" style="color:var(--green)">--</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORIENTATION -->
+    <div class="panel">
+      <div class="panel-title green">CanSat Direction</div>
+      <div class="orient-wrap">
+        <div class="orientation-scene">
+          <img class="orientation-model cansat" id="cs-orientation-model" src="assets/cansat-orientation.svg" alt="CanSat orientation model">
+        </div>
+        <div class="orient-angles">
+          <div class="angle-chip"><span class="angle-label">PITCH</span><span class="angle-num" id="cs-pitch">0.0 deg</span></div>
+          <div class="angle-chip"><span class="angle-label">ROLL</span><span class="angle-num" id="cs-roll">0.0 deg</span></div>
+          <div class="angle-chip"><span class="angle-label">YAW</span><span class="angle-num" id="cs-yaw">0.0 deg</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== CENTER ===================== -->
+  <div id="center-col">
+
+    <!-- MAP -->
+    <div class="panel" id="map-panel">
+      <div class="panel-title">Live Map</div>
+      <div class="map-status-bar">
+        <span class="status-pill inactive" onclick="setPhase(this)">READY</span>
+        <span class="status-pill inactive" onclick="setPhase(this)">UP</span>
+        <span class="status-pill inactive" onclick="setPhase(this)">TOP</span>
+        <span class="status-pill inactive" onclick="setPhase(this)">CHUTE</span>
+        <span class="status-pill inactive" onclick="setPhase(this)">DOWN</span>
+        <span class="status-pill inactive" onclick="setPhase(this)">FOUND</span>
+      </div>
+      <div class="map-area">
+        <div id="leaflet-map"></div>
+      </div>
+
+      <!-- MAP TOOLS: DISTANCE -->
+      <div class="map-tools">
+        <!-- Distance Meters -->
+        <div class="map-tool-card">
+          <div class="map-tool-title">DISTANCE</div>
+          <div class="dist-row"><span>CanSat <-> Rocket</span><span class="dist-val" id="dist-cs-rkt">N/A</span></div>
+          <div class="dist-row"><span>CanSat <-> Ground</span><span class="dist-val" id="dist-cs-gnd">N/A</span></div>
+          <div class="dist-row"><span>Rocket <-> Ground</span><span class="dist-val" id="dist-rkt-gnd">N/A</span></div>
+        </div>
+      </div>
+
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--cyan);"></div><span>Rocket</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div><span>CanSat</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--yellow);"></div><span>Ground Station</span></div>
+      </div>
+    </div>
+
+    <!-- RAW SERIAL -->
+    <div class="panel">
+      <div class="raw-serial-head">
+        <div class="raw-serial-title">Serial Data</div>
+        <div class="csv-state" id="csvState">CSV Logging: OFF</div>
+        <div class="raw-log-actions">
+          <button class="map-btn" id="startCsvLogBtn" onclick="startCsvLog()">Start CSV Log</button>
+          <button class="map-btn idle-disabled" id="stopCsvLogBtn" onclick="stopCsvLog()">Stop CSV Log</button>
+          <button class="map-btn wide" onclick="clearRawSerialLog()">Clear Log</button>
+        </div>
+      </div>
+      <div class="raw-serial-box" id="rawSerialLog"><span class="muted">No incoming data — port not connected.</span></div>
+      <div style="margin-top:10px; display:grid; grid-template-columns: 1fr auto; gap:6px; align-items:center;">
+        <input type="text" id="telemetryInput" class="ctrl-select" style="width:100%; min-height:28px;" placeholder="Paste telemetry CSV line here...">
+        <button class="map-btn" onclick="injectTelemetryString()" style="white-space:nowrap;">Inject CSV</button>
+      </div>
+    </div>
+
+    <!-- TERRAIN CLASSIFICATION (ML) -->
+    <div class="panel" id="terrain-panel">
+      <div class="terrain-head">
+        <div class="panel-title" style="margin-bottom:0;"><span class="led cyan" id="terrain-led"></span>Terrain Classification</div>
+        <div class="terrain-timestamp" id="terrain-updated">No frame analyzed yet</div>
+      </div>
+
+      <div class="terrain-result" style="margin-bottom:10px;">
+        <span class="terrain-class" id="terrain-class-name">--</span>
+        <span class="terrain-confidence" id="terrain-confidence">-- %</span>
+      </div>
+
+      <div class="terrain-probs" id="terrain-prob-list">
+        <div class="no-data-placeholder">No terrain frame analyzed yet.</div>
+      </div>
+
+      <div class="terrain-upload-row">
+        <input type="file" id="terrainFileInput" accept="image/*" style="display:none;" onchange="handleTerrainFileSelected(this)">
+        <button class="map-btn" onclick="document.getElementById('terrainFileInput').click()">Choose Frame</button>
+        <button class="map-btn idle-disabled" id="terrainUploadBtn" style="min-width:110px;" onclick="uploadTerrainFrame()">Upload Frame</button>
+        <span class="terrain-filename" id="terrainFileName">No file selected</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== RIGHT: ROCKET ===================== -->
+  <div style="display:flex;flex-direction:column;gap:10px;">
+
+    <!-- CIRCULAR GAUGES -->
+    <div class="panel">
+      <div class="panel-title">Rocket Data</div>
+      <div class="gauges-grid" id="rocket-gauges"></div>
+    </div>
+
+    <!-- SENSOR CARDS -->
+    <div class="panel">
+      <div class="panel-title">Rocket Sensors</div>
+      <div class="sensor-cards">
+        <div class="sensor-card">
+          <div class="sensor-card-title"><span class="led cyan"></span>ACCEL</div>
+          <div class="sensor-row"><span class="sensor-key">AX</span><span class="sensor-val" id="rkt-ax">0.00 g</span></div>
+          <div class="sensor-row"><span class="sensor-key">AY</span><span class="sensor-val" id="rkt-ay">0.00 g</span></div>
+          <div class="sensor-row"><span class="sensor-key">AZ</span><span class="sensor-val" id="rkt-az">0.00 g</span></div>
+          <svg class="waveform"><polyline id="rkt-accel-wave" points="" fill="none" stroke="var(--cyan)" stroke-width="1.2" opacity="0.7"/></svg>
+        </div>
+        <div class="sensor-card">
+          <div class="sensor-card-title"><span class="led green"></span>GYRO</div>
+          <div class="sensor-row"><span class="sensor-key">GX</span><span class="sensor-val" id="rkt-gx">0.0 deg/s</span></div>
+          <div class="sensor-row"><span class="sensor-key">GY</span><span class="sensor-val" id="rkt-gy">0.0 deg/s</span></div>
+          <div class="sensor-row"><span class="sensor-key">GZ</span><span class="sensor-val" id="rkt-gz">0.0 deg/s</span></div>
+          <svg class="waveform"><polyline id="rkt-gyro-wave" points="" fill="none" stroke="var(--green)" stroke-width="1.2" opacity="0.7"/></svg>
+        </div>
+        <div class="sensor-card full">
+          <div class="sensor-card-title"><span class="led orange"></span>GPS<span class="gnss-badge" id="rkt-sats">-- SATS</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+            <div><div class="sensor-key">TIME</div><div class="sensor-val" id="rkt-gnss-time">N/A</div></div>
+            <div><div class="sensor-key">LAT</div><div class="sensor-val" id="rkt-lat">--</div></div>
+            <div><div class="sensor-key">LON</div><div class="sensor-val" id="rkt-lon">--</div></div>
+            <div><div class="sensor-key">ALT</div><div class="sensor-val" id="rkt-gnss-alt">--</div></div>
+            <div><div class="sensor-key">HDOP</div><div class="sensor-val" id="rkt-hdop">--</div></div>
+            <div><div class="sensor-key">FIX</div><div class="sensor-val" id="rkt-fix" style="color:var(--green)">--</div></div>
+          </div>
+          <!-- Signal strength viz -->
+          <div class="signal-bars" style="margin-top:6px;">
+            <div class="bar" style="height:4px;background:var(--green);"></div>
+            <div class="bar" style="height:7px;background:var(--green);"></div>
+            <div class="bar" style="height:10px;background:var(--green);"></div>
+            <div class="bar" style="height:13px;background:var(--cyan);"></div>
+            <div class="bar" style="height:16px;background:var(--cyan);"></div>
+            <div class="bar" style="height:10px;background:var(--dim);"></div>
+            <div class="bar" style="height:6px;background:var(--dim);"></div>
+          </div>
+        </div>
+        <!-- DIAGNOSTICS -->
+        <div class="sensor-card full">
+          <div class="sensor-card-title"><span class="led green"></span>DIAGNOSTICS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+            <div><div class="sensor-key">VOLTAGE</div><div class="sensor-val" id="rkt-voltage">-- V</div></div>
+            <div><div class="sensor-key">PACKETS</div><div class="sensor-val" id="rkt-packet-count">--</div></div>
+            <div><div class="sensor-key">UPTIME</div><div class="sensor-val" id="rkt-time-stamping">-- s</div></div>
+            <div><div class="sensor-key">STATE</div><div class="sensor-val" id="rkt-state" style="color:var(--green)">--</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORIENTATION -->
+    <div class="panel">
+      <div class="panel-title">Rocket Direction</div>
+      <div class="orient-wrap">
+        <div class="orientation-scene">
+          <img class="orientation-model rocket" id="rkt-orientation-model" src="assets/rocket-orientation.svg" alt="Rocket orientation model">
+        </div>
+        <div class="orient-angles">
+          <div class="angle-chip"><span class="angle-label">PITCH</span><span class="angle-num" id="rkt-pitch">0.0 deg</span></div>
+          <div class="angle-chip"><span class="angle-label">ROLL</span><span class="angle-num" id="rkt-roll">0.0 deg</span></div>
+          <div class="angle-chip"><span class="angle-label">YAW</span><span class="angle-num" id="rkt-yaw">0.0 deg</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- COMPARE GRAPHS -->
+<div id="compare-section">
+  <div class="compare-panel">
+    <div class="compare-head">
+      <div>
+        <div class="compare-title">Temperature °C</div>
+        <div class="compare-subtitle">Rocket / CanSat telemetry</div>
+      </div>
+      <div class="compare-readout" id="cmpTempReadout">0.0</div>
+    </div>
+    <div class="compare-graph"><canvas id="cmpTemp"></canvas></div>
+    <div class="compare-legend">
+      <span><span class="legend-line" style="background:#00e5c8;"></span>Rocket</span>
+      <span><span class="legend-line" style="background:#4dd4ff;"></span>CanSat</span>
+    </div>
+  </div>
+  <div class="compare-panel">
+    <div class="compare-head">
+      <div>
+        <div class="compare-title">Altitude m</div>
+        <div class="compare-subtitle">Actual trajectory</div>
+      </div>
+      <div class="compare-readout" id="cmpAltReadout">0.0</div>
+    </div>
+    <div class="compare-graph"><canvas id="cmpAlt"></canvas></div>
+    <div class="compare-legend">
+      <span><span class="legend-line" style="background:#00e5c8;"></span>Rocket</span>
+      <span><span class="legend-line" style="background:#4dd4ff;"></span>CanSat</span>
+    </div>
+  </div>
+  <div class="compare-panel">
+    <div class="compare-head">
+      <div>
+        <div class="compare-title">Pressure Pa</div>
+        <div class="compare-subtitle">Atmospheric variable</div>
+      </div>
+      <div class="compare-readout" id="cmpPresReadout">0.0</div>
+    </div>
+    <div class="compare-graph"><canvas id="cmpPres"></canvas></div>
+    <div class="compare-legend">
+      <span><span class="legend-line" style="background:#00e5c8;"></span>Rocket</span>
+      <span><span class="legend-line" style="background:#4dd4ff;"></span>CanSat</span>
+    </div>
+  </div>
+  <div class="compare-panel">
+    <div class="compare-head">
+      <div>
+        <div class="compare-title">Velocity m/s</div>
+        <div class="compare-subtitle">Kinematic variable</div>
+      </div>
+      <div class="compare-readout" id="cmpVelReadout">0.0</div>
+    </div>
+    <div class="compare-graph"><canvas id="cmpVel"></canvas></div>
+    <div class="compare-legend">
+      <span><span class="legend-line" style="background:#00e5c8;"></span>Rocket</span>
+      <span><span class="legend-line" style="background:#4dd4ff;"></span>CanSat</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div id="footer">
+  <div class="footer-group">
+    <div class="footer-label">Controls</div>
+    <div class="btn-row">
+      <button class="ctrl-btn connect" onclick="connectSelectedSerials()">CONNECT</button>
+      <button class="ctrl-btn disconnect" onclick="disconnectSerial()">DISCONNECT</button>
+      <button class="ctrl-btn start" onclick="startTelemetry()">START</button>
+      <button class="ctrl-btn stop" onclick="stopTelemetry()">STOP</button>
+      <button class="ctrl-btn sim" id="simBtn" onclick="toggleSim(this)">SIM OFF</button>
+    </div>
+  </div>
+  <div class="footer-divider"></div>
+  <div class="footer-group">
+    <div class="footer-label">Ports</div>
+    <div class="port-strip">
+      <div class="port-control rocket">
+        <span class="port-label">Rocket Port:</span>
+        <select class="ctrl-select" id="rocketPortSelect">
+          <option value="request">Choose Port...</option>
+        </select>
+        <button class="port-connect" onclick="connectSerial('rkt')">Connect</button>
+        <span class="baud-label">Baud:</span>
+        <select class="ctrl-select" id="rocketBaudSelect">
+          <option>4800</option>
+          <option>9600</option>
+          <option>14400</option>
+          <option>19200</option>
+          <option>38400</option>
+          <option>57600</option>
+          <option>115200</option>
+          <option>230400</option>
+          <option>250000</option>
+          <option>460800</option>
+          <option>921600</option>
+          <option>1000000</option>
+          <option value="custom">Custom...</option>
+        </select>
+      </div>
+      <div class="port-control cansat">
+        <span class="port-label">Cansat Port:</span>
+        <select class="ctrl-select" id="cansatPortSelect">
+          <option value="request">Choose Port...</option>
+        </select>
+        <button class="port-connect" onclick="connectSerial('cs')">Connect</button>
+        <span class="baud-label">Baud:</span>
+        <select class="ctrl-select" id="cansatBaudSelect">
+          <option>4800</option>
+          <option>9600</option>
+          <option>14400</option>
+          <option>19200</option>
+          <option>38400</option>
+          <option>57600</option>
+          <option>115200</option>
+          <option>230400</option>
+          <option>250000</option>
+          <option>460800</option>
+          <option>921600</option>
+          <option>1000000</option>
+          <option value="custom">Custom...</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="footer-divider"></div>
+  <div class="footer-group">
+    <div class="footer-label">Sim Speed</div>
+    <div class="speed-btns">
+      <button class="speed-btn" onclick="setSpeed(1,this)">1x</button>
+      <button class="speed-btn active" onclick="setSpeed(2,this)">2x</button>
+      <button class="speed-btn" onclick="setSpeed(5,this)">5x</button>
+      <button class="speed-btn" onclick="setSpeed(10,this)">10x</button>
+    </div>
+  </div>
+  <div class="footer-divider"></div>
+  <div class="footer-group">
+    <div class="footer-label">Connection</div>
+    <div class="comms-status">
+      <div class="comm-item"><span class="led red" id="connectLed"></span><span id="connectStatus">DISCONNECTED</span></div>
+      <div class="comm-item"><span class="led orange" id="receiveLed"></span><span id="receiveStatus">WAITING</span></div>
+      <div class="comm-item">
+        <span style="font-family:var(--font-mono);font-size:0.55rem;color:var(--dim);margin-right:3px;">SIG</span>
+        <div class="signal-bars">
+          <div class="bar" style="height:4px;background:var(--green);"></div>
+          <div class="bar" style="height:7px;background:var(--green);"></div>
+          <div class="bar" style="height:10px;background:var(--green);"></div>
+          <div class="bar" style="height:13px;background:var(--cyan);"></div>
+          <div class="bar" style="height:16px;background:var(--cyan);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-divider"></div>
+  <div class="footer-group" style="flex:1;">
+    <div class="footer-label">Last Data</div>
+    <div class="data-stream" id="dataStream">Choose ports to receive live data.</div>
+  </div>
+</div>
+
+<script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/vendor/leaflet/leaflet.js"></script>
+<script src="assets/vendor/socket.io.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
